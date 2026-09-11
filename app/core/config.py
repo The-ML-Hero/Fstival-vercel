@@ -1,5 +1,5 @@
-from typing import List, Literal, Optional
-from pydantic import Field
+from typing import Any, List, Literal
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -66,6 +66,30 @@ class Settings(BaseSettings):
     TEST_USERS_USER_TOKEN: str = "mock-user-jwt-token-alpha"
     TEST_USERS_STAFF_TOKEN: str = "mock-staff-jwt-token-beta"
     TEST_USERS_ADMIN_TOKEN: str = "mock-admin-jwt-token-gamma"
+
+    @field_validator(
+        "DEBUG",
+        "OPENAI_TIMEOUT_SECONDS",
+        "OLLAMA_TIMEOUT_SECONDS",
+        "PRIORITY_WEIGHT_SEVERITY",
+        "PRIORITY_WEIGHT_EXPLOITABILITY",
+        "PRIORITY_WEIGHT_CONFIDENCE",
+        "PRIORITY_WEIGHT_IMPACT",
+        "REQUIRE_TARGET_AUTHORIZATION_FOR_ANALYSIS",
+        "REQUIRE_TARGET_AUTHORIZATION_FOR_EXECUTION",
+        "MASK_SECRETS_IN_LOGS",
+        "MAX_ADAPTIVE_DEPTH",
+        "MAX_ADAPTIVE_REQUESTS_PER_ATTACK",
+        "MAX_RATE_LIMIT_TEST_REQUESTS",
+        "EXECUTION_TIMEOUT_SECONDS",
+        "REQUEST_TIMEOUT_SECONDS",
+        mode="before",
+    )
+    @classmethod
+    def empty_str_to_default(cls, v: Any, info):
+        if isinstance(v, str) and v.strip() == "":
+            return cls.model_fields[info.field_name].get_default(call_default_factory=True)
+        return v
 
 
 settings = Settings()
