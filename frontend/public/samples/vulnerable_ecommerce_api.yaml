@@ -1,0 +1,187 @@
+openapi: 3.0.1
+info:
+  title: ShopEasy Vulnerable E-Commerce API (Deliberately Flawed Demo)
+  description: Fictional local-only demo API containing intentional security vulnerabilities for defensive simulation.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local Vulnerable Mock Environment
+
+paths:
+  /auth/token:
+    post:
+      summary: User Login
+      description: Returns API Bearer Token
+      operationId: login
+      tags:
+        - Auth
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Logged in
+
+  /users/{userId}:
+    get:
+      summary: Get User Profile
+      operationId: getUser
+      tags:
+        - Users
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User profile data
+    put:
+      summary: Update User Profile (Mass Assignment Vulnerable)
+      description: Allows updating user fields. Vulnerable to role parameter injection.
+      operationId: updateUser
+      tags:
+        - Users
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                role:
+                  type: string
+                  description: Vulnerable field - client can supply 'admin'
+                age:
+                  type: integer
+                  description: Integer underflow candidate
+      responses:
+        '200':
+          description: Profile updated
+
+  /admin/users:
+    get:
+      summary: List All System Users (Broken Authentication)
+      description: Intended for admins, but missing security requirement definition.
+      operationId: listAllUsersAdmin
+      security: []
+      tags:
+        - Admin
+      responses:
+        '200':
+          description: Secret user dump returned unauthenticated
+
+  /orders:
+    post:
+      summary: Create Order
+      operationId: createOrder
+      tags:
+        - Orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      product_id:
+                        type: string
+                      quantity:
+                        type: integer
+                      price:
+                        type: number
+                        description: Client-controlled price parameter (tampering flaw)
+      responses:
+        '201':
+          description: Order created
+
+  /orders/{orderId}:
+    get:
+      summary: View Order (BOLA / IDOR Flaw)
+      description: Returns full invoice and receipt without checking if requester owns the order.
+      operationId: getOrder
+      tags:
+        - Orders
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order data returned
+
+  /orders/{orderId}/pay:
+    post:
+      summary: Pay for Order
+      operationId: payOrder
+      tags:
+        - Payments
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount:
+                  type: number
+                  description: Negative amount test candidate
+                payment_method:
+                  type: string
+      responses:
+        '200':
+          description: Payment confirmed
+
+  /orders/{orderId}/refund:
+    post:
+      summary: Process Refund (Broken Workflow Flaw)
+      description: Processes refund without verifying if order was ever paid or already refunded.
+      operationId: refundOrder
+      tags:
+        - Payments
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Refund processed
+
+components:
+  securitySchemes:
+    UserAuth:
+      type: http
+      scheme: bearer
+
+security:
+  - UserAuth: []

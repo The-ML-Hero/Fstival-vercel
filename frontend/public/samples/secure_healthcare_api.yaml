@@ -1,0 +1,284 @@
+openapi: 3.0.3
+info:
+  title: MediCare Clinical Platform API
+  description: Secure, compliant healthcare management API for clinics, doctors, and patients.
+  version: 2.4.0
+servers:
+  - url: https://api.medicare-secure.local/v1
+    description: Production Encrypted Gateway
+
+paths:
+  /auth/login:
+    post:
+      summary: Clinician & Patient Login
+      description: Exchanges credentials for a short-lived JWT access token.
+      operationId: loginUser
+      security: []
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  example: dr.smith@medicare.local
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  token_type:
+                    type: string
+                    example: Bearer
+                  expires_in:
+                    type: integer
+        '401':
+          description: Invalid credentials
+
+  /patients:
+    get:
+      summary: List Patients
+      description: Lists patient records accessible to the authenticated clinician.
+      operationId: listPatients
+      tags:
+        - Patients
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Patient list retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Patient'
+        '403':
+          description: Insufficient clinical scope
+    post:
+      summary: Register New Patient
+      description: Registers a new patient within the clinic system.
+      operationId: createPatient
+      tags:
+        - Patients
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientInput'
+      responses:
+        '201':
+          description: Patient registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Patient'
+
+  /patients/{patient_id}:
+    get:
+      summary: Get Patient Details
+      description: Retrieves complete clinical file for a specific patient ID.
+      operationId: getPatientById
+      tags:
+        - Patients
+      parameters:
+        - name: patient_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Patient details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Patient'
+        '403':
+          description: Access denied (BOLA protection active)
+        '404':
+          description: Patient not found
+    put:
+      summary: Update Patient Record
+      description: Updates medical records for a patient.
+      operationId: updatePatient
+      tags:
+        - Patients
+      parameters:
+        - name: patient_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientInput'
+      responses:
+        '200':
+          description: Patient updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Patient'
+    delete:
+      summary: Deactivate Patient Record
+      description: Deactivates patient record (Admin only).
+      operationId: deletePatient
+      tags:
+        - Patients
+      parameters:
+        - name: patient_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Patient deactivated
+        '403':
+          description: Requires clinic administrator role
+
+  /patients/{patient_id}/appointments:
+    post:
+      summary: Schedule Patient Appointment
+      description: Creates a new consultation appointment for a patient.
+      operationId: createAppointment
+      tags:
+        - Appointments
+      parameters:
+        - name: patient_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - doctor_id
+                - appointment_date
+              properties:
+                doctor_id:
+                  type: string
+                appointment_date:
+                  type: string
+                  format: date-time
+                notes:
+                  type: string
+      responses:
+        '201':
+          description: Appointment scheduled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Appointment'
+
+  /admin/audit-logs:
+    get:
+      summary: View Clinical Access Logs
+      description: Restricted endpoint for HIPAA audit compliance.
+      operationId: getAuditLogs
+      tags:
+        - Admin
+      security:
+        - BearerAuth:
+            - admin:audit
+      responses:
+        '200':
+          description: Audit log records
+        '403':
+          description: Forbidden - Admin role required
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Token obtained from /auth/login
+
+  schemas:
+    Patient:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        first_name:
+          type: string
+        last_name:
+          type: string
+        date_of_birth:
+          type: string
+          format: date
+        medical_record_number:
+          type: string
+        assigned_doctor_id:
+          type: string
+
+    PatientInput:
+      type: object
+      required:
+        - first_name
+        - last_name
+        - date_of_birth
+      properties:
+        first_name:
+          type: string
+        last_name:
+          type: string
+        date_of_birth:
+          type: string
+          format: date
+
+    Appointment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        patient_id:
+          type: string
+        doctor_id:
+          type: string
+        appointment_date:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [SCHEDULED, COMPLETED, CANCELLED]
+
+security:
+  - BearerAuth: []
